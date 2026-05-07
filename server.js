@@ -5,21 +5,47 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// This variable acts as the "Memory" for Limika
-let currentCommand = { action: "parking", active: false };
+// System Memory
+let state = {
+  action: "parking",
+  active: false,
+  lastUpdate: Date.now()
+};
 
-// ROUTE 1: Your Dashboard calls this to set a movement
+let telemetry = {
+  temp: 0,
+  hum: 0,
+  timestamp: null
+};
+
+// DASHBOARD ENDPOINT: UI sends commands here
 app.post("/control", (req, res) => {
   const { action, active } = req.body;
-  currentCommand = { action, active }; 
-  console.log("New Command Stored:", action);
-  res.json({ status: "Success", stored: currentCommand });
+  state = { action, active, lastUpdate: Date.now() };
+  console.log(`[COMMAND] ${action.toUpperCase()} - Active: ${active}`);
+  res.json({ status: "applied", state });
 });
 
-// ROUTE 2: Your ESP32 calls this to ask "What should I do?"
+// HARDWARE ENDPOINT: ESP32 polls this every 150ms
 app.get("/control", (req, res) => {
-  res.json(currentCommand);
+  res.json(state);
+});
+
+// TELEMETRY ENDPOINT: ESP32 sends DHT11 data here
+app.post("/sensors", (req, res) => {
+  telemetry = { 
+    temp: req.body.temp, 
+    hum: req.body.hum, 
+    timestamp: new Date().toLocaleString() 
+  };
+  console.log(`[FARM DATA] Temp: ${telemetry.temp}°C | Hum: ${telemetry.hum}%`);
+  res.json({ status: "logged" });
+});
+
+// UI ENDPOINT: To display sensor data on your dashboard
+app.get("/telemetry", (req, res) => {
+  res.json(telemetry);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Limika Server Live on Port ${PORT}`));
+app.listen(PORT, () => console.log(`Limika Cloud Engine 1.0 - Port ${PORT}`));
