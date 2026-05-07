@@ -1,51 +1,36 @@
 const express = require("express");
 const cors = require("cors");
-const app = express();
 
+const app = express();
 app.use(cors());
 app.use(express.json());
 
-// System Memory
-let state = {
-  action: "parking",
-  active: false,
-  lastUpdate: Date.now()
-};
+let lastCommand = { action: "parking", active: true };
+let sensors = { temperature: 0, humidity: 0 };
 
-let telemetry = {
-  temp: 0,
-  hum: 0,
-  timestamp: null
-};
-
-// DASHBOARD ENDPOINT: UI sends commands here
+// Store motor command
 app.post("/control", (req, res) => {
-  const { action, active } = req.body;
-  state = { action, active, lastUpdate: Date.now() };
-  console.log(`[COMMAND] ${action.toUpperCase()} - Active: ${active}`);
-  res.json({ status: "applied", state });
+  lastCommand = req.body;
+  console.log("Command received:", lastCommand);
+  res.json({ status: "ok" });
 });
 
-// HARDWARE ENDPOINT: ESP32 polls this every 150ms
+// Return last motor command
 app.get("/control", (req, res) => {
-  res.json(state);
+  res.json(lastCommand);
 });
 
-// TELEMETRY ENDPOINT: ESP32 sends DHT11 data here
+// Store sensor data from ESP32
 app.post("/sensors", (req, res) => {
-  telemetry = { 
-    temp: req.body.temp, 
-    hum: req.body.hum, 
-    timestamp: new Date().toLocaleString() 
-  };
-  console.log(`[FARM DATA] Temp: ${telemetry.temp}°C | Hum: ${telemetry.hum}%`);
-  res.json({ status: "logged" });
+  sensors = req.body;
+  console.log("Sensor data updated:", sensors);
+  res.json({ status: "ok" });
 });
 
-// UI ENDPOINT: To display sensor data on your dashboard
-app.get("/telemetry", (req, res) => {
-  res.json(telemetry);
+// Return latest sensor data
+app.get("/sensors", (req, res) => {
+  res.json(sensors);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Limika Cloud Engine 1.0 - Port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
