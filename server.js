@@ -5,45 +5,27 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Global persistent state
-let systemState = { 
-    action: "parking", 
-    active: false 
-};
+let systemState = { action: "parking", active: false };
+let farmTelemetry = { temp: 0, hum: 0, lastSync: "Never" };
 
-let sensorLogs = { 
-    temp: "0", 
-    hum: "0", 
-    time: null 
-};
-
-// ESP32 and Dashboard use this to get current orders
-app.get("/control", (req, res) => {
-    res.status(200).json(systemState);
-});
-
-// Dashboard uses this to send new orders
+// Motor Logic
+app.get("/control", (req, res) => res.json(systemState));
 app.post("/control", (req, res) => {
-    const { action, active } = req.body;
-    if (action !== undefined && active !== undefined) {
-        systemState = { action, active };
-        console.log(`[CLOUD] Command Updated: ${action}`);
-        res.json({ status: "success", current: systemState });
-    } else {
-        res.status(400).json({ error: "Invalid payload" });
-    }
+    systemState = { action: req.body.action, active: req.body.active };
+    res.json({ status: "ok" });
 });
 
-// ESP32 uses this to push DHT11 data
+// DHT11 Logic
 app.post("/sensors", (req, res) => {
-    sensorLogs = { 
+    farmTelemetry = { 
         temp: req.body.temp, 
         hum: req.body.hum, 
-        time: new Date().toISOString() 
+        lastSync: new Date().toLocaleTimeString() 
     };
-    console.log(`[FARM] DHT11: ${sensorLogs.temp}C, ${sensorLogs.hum}%`);
-    res.json({ status: "received" });
+    console.log(`[DATA] ${farmTelemetry.temp}°C | ${farmTelemetry.hum}%`);
+    res.json({ status: "logged" });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Limika Cloud Engine Solid on port ${PORT}`));
+app.get("/telemetry", (req, res) => res.json(farmTelemetry));
+
+app.listen(process.env.PORT || 3000, () => console.log("Limika Engine Online"));
