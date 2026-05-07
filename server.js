@@ -1,36 +1,49 @@
 const express = require("express");
 const cors = require("cors");
-
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-let lastCommand = { action: "parking", active: true };
-let sensors = { temperature: 0, humidity: 0 };
+// Global persistent state
+let systemState = { 
+    action: "parking", 
+    active: false 
+};
 
-// Store motor command
-app.post("/control", (req, res) => {
-  lastCommand = req.body;
-  console.log("Command received:", lastCommand);
-  res.json({ status: "ok" });
-});
+let sensorLogs = { 
+    temp: "0", 
+    hum: "0", 
+    time: null 
+};
 
-// Return last motor command
+// ESP32 and Dashboard use this to get current orders
 app.get("/control", (req, res) => {
-  res.json(lastCommand);
+    res.status(200).json(systemState);
 });
 
-// Store sensor data from ESP32
+// Dashboard uses this to send new orders
+app.post("/control", (req, res) => {
+    const { action, active } = req.body;
+    if (action !== undefined && active !== undefined) {
+        systemState = { action, active };
+        console.log(`[CLOUD] Command Updated: ${action}`);
+        res.json({ status: "success", current: systemState });
+    } else {
+        res.status(400).json({ error: "Invalid payload" });
+    }
+});
+
+// ESP32 uses this to push DHT11 data
 app.post("/sensors", (req, res) => {
-  sensors = req.body;
-  console.log("Sensor data updated:", sensors);
-  res.json({ status: "ok" });
-});
-
-// Return latest sensor data
-app.get("/sensors", (req, res) => {
-  res.json(sensors);
+    sensorLogs = { 
+        temp: req.body.temp, 
+        hum: req.body.hum, 
+        time: new Date().toISOString() 
+    };
+    console.log(`[FARM] DHT11: ${sensorLogs.temp}C, ${sensorLogs.hum}%`);
+    res.json({ status: "received" });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Limika Cloud Engine Solid on port ${PORT}`));.log(`Server running on port ${PORT}`));
